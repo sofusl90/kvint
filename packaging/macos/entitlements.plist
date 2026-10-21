@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+        Hardened Runtime entitlements for direct distribution (DMG /
+        GitHub release). Minimum-privilege: only what we actually use.
+
+        Network (iroh): outbound peer connections + mDNS listening / serving.
+    -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+    <key>com.apple.security.network.server</key>
+    <true/>
+
+    <!--
+        Hardened-Runtime exceptions we deliberately do NOT enable:
+          com.apple.security.cs.allow-jit                     — no JIT.
+          com.apple.security.cs.allow-unsigned-executable-memory — no JIT.
+          com.apple.security.cs.disable-library-validation    — only sign-by-us libs.
+          com.apple.security.cs.disable-executable-page-protection — n/a.
+        Leaving these off gives us the strictest Gatekeeper posture.
+    -->
+</dict>
+</plist>

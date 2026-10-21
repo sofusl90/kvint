@@ -1,0 +1,62 @@
+[package]
+name = "kvint"
+version = "0.1.0"
+authors = ["sofus <sofus@laubel.net>"]
+edition = "2021"
+
+[package.metadata.cargo-apple.ios]
+frameworks = ["AudioToolbox", "SystemConfiguration", "Network"]
+
+[lib]
+# Android also needs "cdylib", but it can't link the iOS-only `ios_screen_bounds` extern yet.
+crate-type = ["staticlib", "rlib"]
+
+[[bin]]
+name = "kvint-desktop"
+path = "gen/bin/desktop.rs"
+
+[dependencies]
+# Only the Bevy features a 2D board game needs; the defaults pull in the whole 3D stack.
+bevy = { version = "0.18.1", default-features = false, features = [
+    "default_app",
+    "default_platform",
+    "2d_api",
+    "bevy_render",
+    "bevy_core_pipeline",
+    "bevy_sprite_render",
+    "ui_api",
+    "bevy_ui_render",
+    "bevy_text",
+    "audio",
+    "wav",
+    "png",
+] }
+crossbeam-channel = "0.5.15"
+rand = "0.10.1"
+iroh = { version = "0.98.1", features = ["address-lookup-mdns"] }
+tokio = { version = "1.52.1", features = ["rt-multi-thread", "sync", "macros", "io-util", "time"] }
+qrcode = { version = "0.14.1", default-features = false }
+n0-future = "0.3.2"
+# "brave-otter"-style names for players on the LAN.
+petname = { version = "3", default-features = false, features = ["default-words", "default-rng"] }
+
+[dev-dependencies]
+image = { version = "0.25.10", default-features = false, features = ["png"] }
+
+# Clipboard — desktop only. Mobile gets a different UX (e.g. QR scanning) later.
+[target.'cfg(not(any(target_os = "ios", target_os = "android")))'.dependencies]
+arboard = "3.6.1"
+
+# Optimise dependencies in dev builds; our own crate stays quick to rebuild.
+[profile.dev.package."*"]
+opt-level = 1
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+
+# Xcode debug builds overflow the unwind-table limit and break codesign.
+[profile.dev]
+panic = "abort"

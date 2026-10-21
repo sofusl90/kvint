@@ -1,0 +1,17 @@
+# Uncomment the next line to define a global platform for your project
+
+target 'kvint_iOS' do
+platform :ios, '13.0'
+  
+
+  # Pods for kvint_iOS
+  
+end
+
+target 'kvint_macOS' do
+platform :osx, '11.0'
+  
+
+  # Pods for kvint_macOS
+  
+end

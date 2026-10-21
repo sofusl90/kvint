@@ -1,0 +1,251 @@
+name: kvint
+options:
+  bundleIdPrefix: dk.laubel.kvint
+  deploymentTarget:
+    iOS: 13.0
+    macOS: 11.0
+fileGroups: [../../src]
+configs:
+  # Capitalized to match Apple convention. xcodegen passes the config
+  # *name* (left side) through to Xcode's $(CONFIGURATION) variable;
+  # using "Debug"/"Release" makes the prebuild script's
+  # `[ "${CONFIGURATION}" = "Release" ]` check fire correctly, so cargo
+  # is invoked with `--release` for Archive builds. Lowercase names here
+  # silently produced Debug-profile Rust libs inside Release archives.
+  Debug: debug
+  Release: release
+settingGroups:
+  app:
+    base:
+      PRODUCT_NAME: Kvint
+      PRODUCT_BUNDLE_IDENTIFIER: dk.laubel.kvint
+      # MUST stay NO — our pre-build script invokes `cargo` which the
+      # sandbox blocks. Xcode's "Update to Recommended Settings" prompt
+      # tries to flip this on; pin it explicitly so we're safe across
+      # xcodegen regenerations.
+      ENABLE_USER_SCRIPT_SANDBOXING: NO
+      # Apple Developer team ID (`sofus@laubel.dk`). Pinning here so
+      # signing survives `regen_ios.sh` and any contributor running it
+      # gets the same team picked up automatically. Combined with
+      # Automatic signing below, Xcode handles cert + profile creation.
+      DEVELOPMENT_TEAM: 5M9MG2DJR7
+      CODE_SIGN_STYLE: Automatic
+targetTemplates:
+  app:
+    type: application
+    sources:
+      - path: Sources
+    scheme:
+      environmentVariables:
+        RUST_BACKTRACE: full
+        # Tuned per-crate filters — kept at `info` overall so our app's
+        # logs stay visible, with these specific known-noisy crates dropped
+        # to error-only:
+        #   * winit             — "non-redraw event after main loop" spam
+        #     (iOS event-loop quirk; not actionable from app side).
+        #   * swarm_discovery   — "error sending mDNS" repeats every ~1s
+        #     when the iOS Local Network permission is missing or the LAN
+        #     can't multicast. Real failures are non-fatal anyway; the
+        #     user can still copy/paste a code by hand.
+        #   * iroh::net_report  — "IPv4 address detected by QAD varies"
+        #     is a transient probe warning, not actionable.
+        RUST_LOG: info,winit=error,swarm_discovery=error,iroh::net_report=error,bevy_gilrs=off
+    settings:
+      groups: [app]
+targets:
+  kvint_iOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+        excludes:
+          # cargo-built static libs live under Sources/<arch>/ — they're
+          # consumed via the framework dep, not as project sources, and
+          # if xcodegen pulls them in as Resources we get
+          # "Multiple commands produce libkvint.a" at build time.
+          - "**/*.a"
+      - path: assets
+        buildPhase: resources
+        type: folder
+      # App-icon Asset Catalog. Regenerate by running
+      # scripts/gen_app_icons.sh from the repo root.
+      - path: Assets.xcassets
+      - path: kvint_iOS/PrivacyInfo.xcprivacy
+
+    info:
+      path: kvint_iOS/Info.plist
+      properties:
+        LSRequiresIPhoneOS: true
+        UILaunchStoryboardName: LaunchScreen
+        UIRequiredDeviceCapabilities: [arm64, metal]
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        CFBundleShortVersionString: "1.0.0"
+        # Quoted so YAML parses as a string. Without quotes, xcodegen emits
+        # `<integer>1</integer>` in Info.plist and the App Store upload
+        # validator rejects: "CFBundleVersion is empty but must be composed
+        # of one to three period-separated integers."
+        # Bump per upload — Apple rejects duplicate build numbers even
+        # after canceling a review. CFBundleShortVersionString only
+        # changes for new public versions.
+        CFBundleVersion: "2"
+        ITSAppUsesNonExemptEncryption: false
+        # Required for iroh's mDNS-based local-peer discovery on iOS.
+        # Without these the OS denies all multicast/Bonjour traffic and
+        # the log fills with `error sending mDNS: No route to host`.
+        NSLocalNetworkUsageDescription: "Kvint uses your local network to find nearby players for offline LAN matches."
+        NSBonjourServices:
+          - _irohv1._udp
+        # Custom URL scheme so QR codes / deep links pointing at
+        # kvint://join/<NODE_ID> open the app and trigger the join
+        # flow directly. Without this, iOS Camera treats scanned
+        # codes as opaque text and falls back to web search.
+        CFBundleURLTypes:
+          - CFBundleURLName: dk.laubel.kvint
+            CFBundleURLSchemes:
+              - kvint
+        
+    scheme:
+      environmentVariables:
+        RUST_BACKTRACE: full
+        # Tuned per-crate filters — kept at `info` overall so our app's
+        # logs stay visible, with these specific known-noisy crates dropped
+        # to error-only:
+        #   * winit             — "non-redraw event after main loop" spam
+        #     (iOS event-loop quirk; not actionable from app side).
+        #   * swarm_discovery   — "error sending mDNS" repeats every ~1s
+        #     when the iOS Local Network permission is missing or the LAN
+        #     can't multicast. Real failures are non-fatal anyway; the
+        #     user can still copy/paste a code by hand.
+        #   * iroh::net_report  — "IPv4 address detected by QAD varies"
+        #     is a transient probe warning, not actionable.
+        RUST_LOG: info,winit=error,swarm_discovery=error,iroh::net_report=error,bevy_gilrs=off
+    settings:
+      base:
+        ENABLE_BITCODE: false
+        ARCHS: [arm64]
+        VALID_ARCHS:  arm64
+        LIBRARY_SEARCH_PATHS[sdk=iphoneos*]: $(inherited) $(PROJECT_DIR)/Sources/aarch64-apple-ios/$(CONFIGURATION)
+        LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]: $(inherited) "/Users/sofus/25/kvint/target-xcode/aarch64-apple-ios-sim/$(CONFIGURATION)"
+        ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: true
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+      groups: [app]
+    dependencies:
+      - framework: libkvint.a
+        embed: false
+      
+      
+      
+      - sdk: CoreGraphics.framework
+      - sdk: Metal.framework
+      - sdk: MetalKit.framework
+      - sdk: QuartzCore.framework
+      - sdk: Security.framework
+      - sdk: UIKit.framework
+      
+      - sdk: AudioToolbox.framework
+      - sdk: SystemConfiguration.framework
+      - sdk: Network.framework
+    preBuildScripts:
+
+      - script: |-
+          set -e
+          PATH=${PATH}:${HOME:?}/.cargo/bin
+
+          # Direct cargo invocation (NOT cargo-apple xcode-script). We
+          # bypass cargo-apple because it forwards Xcode env vars like
+          # FRAMEWORK_SEARCH_PATHS / HEADER_SEARCH_PATHS / DERIVED_DATA
+          # paths to cargo, and Xcode rewrites those every build with
+          # build-specific UUIDs in them. cc-rs build scripts in
+          # transitive deps see those changes as input changes and
+          # invalidate cargo's fingerprint, which then cascades to a full
+          # recompile of bevy + iroh + kvint on every Xcode build.
+          #
+          # We only need CFLAGS_aarch64_apple_ios pointed at the iOS SDK
+          # so cc-rs targets iOS correctly. Everything else is scrubbed
+          # below — see the env-unset block.
+
+          # 1. Isolated target dir for Xcode-driven builds. Without this,
+          #    a `cargo check` from the terminal (different env: no
+          #    SDKROOT, different CC, different PATH ordering) shares the
+          #    same `target/aarch64-apple-ios/` fingerprint dir and
+          #    invalidates everything for the next Xcode build. With its
+          #    own dir, Xcode and CLI cargo never fight.
+          export CARGO_TARGET_DIR="$SRCROOT/../../target-xcode"
+
+          # 2. Drop Xcode-injected toolchain env vars that cc-rs reads.
+          #    Xcode sets CC / CXX / CFLAGS etc. to wrappers under
+          #    DerivedData/.../Build/Intermediates.noindex/<UUID>/...,
+          #    and the UUID changes between Clean→Build cycles. cc-rs
+          #    records these in its build-script fingerprint, so any
+          #    change cascades into recompiling every C/C++-using crate
+          #    (ring, brotli, image deps, etc.). With these unset, cc-rs
+          #    falls back to `xcrun --sdk iphoneos --find clang`, which
+          #    is stable across invocations.
+          unset CC CXX CPP CFLAGS CXXFLAGS CPPFLAGS LDFLAGS \
+                AR AS LD NM RANLIB STRIP OBJCOPY OBJDUMP
+
+          # Map Xcode CONFIGURATION → cargo profile flag.
+          CARGO_PROFILE_FLAG=""
+          PROFILE_DIR="debug"
+          if [ "${CONFIGURATION}" = "Release" ]; then
+              CARGO_PROFILE_FLAG="--release"
+              PROFILE_DIR="release"
+          fi
+
+          # Map Xcode SDK → Rust target. Simulator builds use the
+          # aarch64-apple-ios-sim triple; device builds use aarch64-apple-ios.
+          # LIBRARY_SEARCH_PATHS in this project is already split by SDK:
+          #   - iphoneos*        → $SRCROOT/Sources/aarch64-apple-ios/$CONFIG
+          #   - iphonesimulator* → $CARGO_TARGET_DIR/aarch64-apple-ios-sim/$CONFIG
+          # So for sim we just let cargo write where Xcode already looks
+          # (no copy step). For device we keep the copy-into-Sources/ layout.
+          if [ "${PLATFORM_NAME}" = "iphonesimulator" ]; then
+              RUST_TARGET="aarch64-apple-ios-sim"
+          else
+              RUST_TARGET="aarch64-apple-ios"
+          fi
+
+          export CFLAGS_aarch64_apple_ios="-isysroot ${SDKROOT}"
+          export CXXFLAGS_aarch64_apple_ios="-isysroot ${SDKROOT}"
+          export CFLAGS_aarch64_apple_ios_sim="-isysroot ${SDKROOT}"
+          export CXXFLAGS_aarch64_apple_ios_sim="-isysroot ${SDKROOT}"
+
+          # SRCROOT is gen/apple ; the cargo project root (containing
+          # Cargo.toml) is two levels up.
+          PROJECT_ROOT="$SRCROOT/../.."
+          cd "$PROJECT_ROOT"
+
+          cargo build --target "$RUST_TARGET" --lib $CARGO_PROFILE_FLAG
+
+          SRC="$CARGO_TARGET_DIR/${RUST_TARGET}/${PROFILE_DIR}/libkvint.a"
+
+          if [ "${PLATFORM_NAME}" = "iphonesimulator" ]; then
+              # Sim: Xcode reads libkvint.a directly from CARGO_TARGET_DIR,
+              # so cargo's own output is the destination — no copy.
+              echo "kvint: sim build at $SRC"
+          else
+              # Device: copy into the location the Xcode project expects,
+              # but ONLY if content has changed. An unconditional copy
+              # bumps mtime and forces Xcode to re-link and re-sign the
+              # .app every build, which is exactly what we're avoiding.
+              DEST="$SRCROOT/Sources/aarch64-apple-ios/${CONFIGURATION}/libkvint.a"
+              mkdir -p "$(dirname "$DEST")"
+              if [ ! -f "$DEST" ] || ! cmp -s "$SRC" "$DEST"; then
+                  cp "$SRC" "$DEST"
+                  echo "kvint: libkvint.a updated"
+              else
+                  echo "kvint: libkvint.a unchanged, skipping copy"
+              fi
+          fi
+        name: Build Rust Code
+        basedOnDependencyAnalysis: false
+        outputFiles:
+          - $(SRCROOT)/Sources/aarch64-apple-ios/${CONFIGURATION}/libkvint.a

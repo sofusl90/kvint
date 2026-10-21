@@ -1,0 +1,34 @@
+# Rust build artifacts (also covers target/icons/, target/icon-variants/ etc.)
+target/
+# Xcode-driven cargo builds keep their own target dir so CLI cargo and
+# Xcode cargo don't trample each other's fingerprints. See the prebuild
+# script in gen/apple/project.yml.
+target-xcode/
+**/*.rs.bk
+
+# cargo-mobile2: cargo build outputs / symlinks inside the iOS scaffolding.
+# The rest of gen/apple/ (project.yml, Sources/kvint, Assets.xcassets,
+# kvint_iOS) IS source-of-truth and must stay tracked.
+gen/apple/Sources/aarch64-apple-ios/
+gen/apple/Sources/aarch64-apple-ios-sim/
+gen/apple/Sources/x86_64-apple-ios/
+gen/apple/Sources/x86_64-apple-ios-sim/
+gen/apple/assets
+gen/apple/target/
+gen/apple/kvint.xcodeproj/
+
+# Future Android scaffolding — same pattern: keep the source files
+# (manifest, build.gradle, res/) but ignore generated outputs.
+gen/android/app/build/
+gen/android/.gradle/
+gen/android/local.properties
+gen/android/build/
+
+# .cargo overrides cargo-mobile2 may write
+.cargo/
+
+# Distributable outputs (.app, .dmg, .apk) — produced by scripts/*.sh
+dist/
+
+# macOS metadata
+.DS_Store

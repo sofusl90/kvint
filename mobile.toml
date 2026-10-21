@@ -1,0 +1,7 @@
+[app]
+name = "kvint"
+stylized-name = "Kvint"
+identifier = "dk.laubel.kvint"
+template-pack = "bevy"
+
+[apple]

@@ -1,0 +1,15 @@
+pub mod app;
+pub mod audio;
+pub mod board;
+pub mod computer;
+pub mod game_over;
+pub mod how_to_play;
+pub mod loading;
+pub mod lobby;
+pub mod menu;
+pub mod net;
+pub mod pause;
+pub mod fatal;
+pub mod settings_io;
+pub mod theme;
+pub mod ui_scale;
